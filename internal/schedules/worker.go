@@ -25,22 +25,22 @@ func checkAndSendEmails() {
 	now := time.Now()
 	// Get all active schedules that are due to be sent
 	query := `SELECT 
-				id, user_id, greeting_id, start_date, frequency_type, frequency_interval, time_of_day, is_active 
-				FROM schedules 
+				id, user_id, greeting_id, start_date, frequency_type, frequency_interval, scheduled_time, is_active 
+	FROM schedules 
 				WHERE is_active = true 
-				AND start_date <= $1 
-				AND (
+		AND start_date <= $1
+		AND (
 					frequency_type = 'once' 
 					OR frequency_type = 'daily'
 				)
 				AND (
-					(current_date + time_of_day::time) <= $1
+					scheduled_time <= $1
 				)
 				AND (
 					last_sent_at IS NULL 
 					OR last_sent_at::date < current_date
-  )
-`
+		)
+	`
 	rows, err := db.Pool.Query(context.Background(), query, now)
 	if err != nil {
 		log.Println("Error querying schedules:", err)
@@ -49,9 +49,8 @@ func checkAndSendEmails() {
 	defer rows.Close()
 
 	for rows.Next() {
-
 		var schedule Schedule
-		if err := rows.Scan(&schedule.ID, &schedule.UserID, &schedule.GreetingID, &schedule.StartDate, &schedule.FrequencyType, &schedule.FrequencyInterval, &schedule.TimeOfDay, &schedule.IsActive); err != nil {
+		if err := rows.Scan(&schedule.ID, &schedule.UserID, &schedule.GreetingID, &schedule.StartDate, &schedule.FrequencyType, &schedule.FrequencyInterval, &schedule.ScheduledTime, &schedule.IsActive); err != nil {
 			log.Println("Error scanning schedule:", err)
 			continue
 		}

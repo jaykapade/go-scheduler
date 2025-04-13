@@ -18,7 +18,7 @@ type Schedule struct {
 	StartDate         time.Time `json:"start_date"`
 	FrequencyType     string    `json:"frequency_type"`
 	FrequencyInterval int       `json:"frequency_interval"`
-	TimeOfDay         string    `json:"time_of_day"`
+	ScheduledTime     time.Time `json:"scheduled_time"`
 	IsActive          bool      `json:"is_active"`
 	LastSentAt        time.Time `json:"last_sent_at"`
 	LatestError       *string   `json:"latest_error"`
@@ -41,10 +41,9 @@ func CreateScheduleHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Parse the time_of_day as a proper time object
-	timeOfDayParsed, err := time.Parse("15:04:05", schedule.TimeOfDay)
-	if err != nil {
-		http.Error(w, "invalid time format for time_of_day", http.StatusBadRequest)
+	// Validate that scheduled_time is set
+	if schedule.ScheduledTime.IsZero() {
+		http.Error(w, "scheduled_time is required", http.StatusBadRequest)
 		return
 	}
 
@@ -60,9 +59,9 @@ func CreateScheduleHandler(w http.ResponseWriter, r *http.Request) {
 	schedule.UserID = userId
 
 	// Insert the schedule into the database
-	query = `INSERT INTO SCHEDULES (id, user_id, greeting_id, start_date, frequency_type, frequency_interval, time_of_day, is_active, last_sent_at, latest_error)
+	query = `INSERT INTO SCHEDULES (id, user_id, greeting_id, start_date, frequency_type, frequency_interval, scheduled_time, is_active, last_sent_at, latest_error)
 			VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`
-	_, err = db.Pool.Exec(context.Background(), query, schedule.ID, schedule.UserID, schedule.GreetingID, schedule.StartDate, schedule.FrequencyType, schedule.FrequencyInterval, timeOfDayParsed, schedule.IsActive, schedule.LastSentAt, schedule.LatestError)
+	_, err = db.Pool.Exec(context.Background(), query, schedule.ID, schedule.UserID, schedule.GreetingID, schedule.StartDate, schedule.FrequencyType, schedule.FrequencyInterval, schedule.ScheduledTime, schedule.IsActive, schedule.LastSentAt, schedule.LatestError)
 	if err != nil {
 		http.Error(w, "failed to create schedule", http.StatusInternalServerError)
 		return
@@ -76,7 +75,7 @@ func ListSchedulesHandler(w http.ResponseWriter, r *http.Request) {
 	userIdStr := auth.GetUserID(r)
 	userId, _ := uuid.Parse(userIdStr)
 
-	query := `SELECT id, greeting_id, start_date, frequency_type, frequency_interval, time_of_day, is_active, last_sent_at, latest_error FROM schedules WHERE user_id = $1`
+	query := `SELECT id, greeting_id, start_date, frequency_type, frequency_interval, scheduled_time, is_active, last_sent_at, latest_error FROM schedules WHERE user_id = $1`
 	rows, err := db.Pool.Query(context.Background(), query, userId)
 	if err != nil {
 		http.Error(w, "failed to fetch schedules", http.StatusInternalServerError)
@@ -87,7 +86,7 @@ func ListSchedulesHandler(w http.ResponseWriter, r *http.Request) {
 	var schedules []Schedule
 	for rows.Next() {
 		var schedule Schedule
-		err = rows.Scan(&schedule.ID, &schedule.GreetingID, &schedule.StartDate, &schedule.FrequencyType, &schedule.FrequencyInterval, &schedule.TimeOfDay, &schedule.IsActive, &schedule.LastSentAt, &schedule.LatestError)
+		err = rows.Scan(&schedule.ID, &schedule.GreetingID, &schedule.StartDate, &schedule.FrequencyType, &schedule.FrequencyInterval, &schedule.ScheduledTime, &schedule.IsActive, &schedule.LastSentAt, &schedule.LatestError)
 		if err != nil {
 			http.Error(w, "failed to scan schedule", http.StatusInternalServerError)
 			return
